@@ -5,8 +5,15 @@ import random
 import sqlite3 
 import csv
 import os
+from dotenv import load_dotenv
 
-catApiKey="live_mTtAjpVIB6YQJ2bg39hbIXxFyGUCDzqvZEFSurGt5RiJUcryIpNAoaL2uFvZmDs6"
+load_dotenv()  # Carga variables desde .env al entorno
+
+TOKEN = os.getenv("DISCORD_TOKEN") or os.getenv("TOKEN")
+if not TOKEN:
+    raise RuntimeError("Discord token not found. Añade DISCORD_TOKEN a tu archivo .env")
+
+catApiKey = os.getenv("CATAPIKEY")
 
 # Nombre del archivo de la base de datos
 DB_FILE = "pokemon_collection.db"
@@ -337,5 +344,4 @@ async def collection(ctx):
 # =======================================================
 # Ejecutar el Bot con tu Token
 # =======================================================
-TOKEN = "MTQ0MTE2NTM5NjQwODUzMzA2Mw.GC7SyN.r08hk0_ZWHGuOGBNvgmbLqiOvz_-P3X9Lu130o"
 bot.run(TOKEN)
