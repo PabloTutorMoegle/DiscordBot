@@ -235,7 +235,7 @@ async def kitty(ctx):
 
 
 # =======================================================
-# Comando para mandar carta Pokémon sacada de la API (MODIFICADO para guardar)
+# Comando para mandar Pokémon
 # =======================================================
 @bot.command()
 async def pokemon(ctx):
@@ -331,7 +331,7 @@ async def pokemon(ctx):
         return
 
 # =======================================================
-# Nuevo Comando para ver la colección
+# Comando para ver la colección
 # =======================================================
 @bot.command()
 async def collection(ctx):
