@@ -32,7 +32,8 @@ def setup_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     
-    c.execute("""
+    # Ejecutar múltiples sentencias SQL de una vez usando executescript
+    c.executescript("""
         CREATE TABLE IF NOT EXISTS user_cards (
             user_id INTEGER NOT NULL,
             card_name TEXT NOT NULL,
@@ -40,7 +41,11 @@ def setup_db():
             image_url TEXT NOT NULL,
             count INTEGER NOT NULL DEFAULT 1,
             PRIMARY KEY (user_id, card_name)
-        )
+        );
+        CREATE TABLE IF NOT EXISTS user_levels (
+            user_id INTEGER PRIMARY KEY,
+            level INTEGER NOT NULL DEFAULT 0
+        );
     """)
     
     conn.commit()
@@ -80,6 +85,28 @@ def get_user_collection(user_id):
     conn.close()
     return collection
 
+def set_user_level(user_id, increment):
+    """Suma `increment` (por defecto 10) al nivel del usuario. Si no existe, lo crea con nivel inicial 1 + increment."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    try:
+        c.execute("SELECT level FROM user_levels WHERE user_id = ?", (user_id,))
+        row = c.fetchone()
+        if row:
+            new_level = row[0] + increment
+            c.execute("UPDATE user_levels SET level = ? WHERE user_id = ?", (new_level, user_id))
+        else:
+            new_level = 1 + increment
+            c.execute("INSERT INTO user_levels (user_id, level) VALUES (?, ?)", (user_id, new_level))
+        conn.commit()
+        return new_level
+    finally:
+        conn.close()
+
+def has_level(points):
+    """Funcion para ver que cantidad de puntos tiene y asi poder determianr el livel del usuario"""
+    level = points // 100
+    return level
 # -------------------------------------------------------
 
 # 🚨 Ejecutar la inicialización de la DB ANTES de conectar el bot
@@ -149,6 +176,7 @@ bot.remove_command('help')
 @bot.command()
 async def hola(ctx):
     await ctx.send(f'¡Hey, {ctx.author.mention}! Moerning from the internet.')
+    new_level = set_user_level(ctx.author.id, increment=5)
 
 # =======================================================
 # Comando de ayuda para ver los posibles comandos
@@ -167,6 +195,7 @@ async def help(ctx):
     embed.add_field(name="!kitty", value="Sends a random picture of a cat.", inline=False)
     embed.add_field(name="!pokemon", value="Sends a random Pokémon card.", inline=False)
     embed.add_field(name="**!collection**", value="Shows your Pokémon card collection. 🎒", inline=False)
+    embed.add_field(name="!lvl", value="Shows your user level.", inline=False)
     
     await ctx.send(embed=embed)
 
@@ -216,6 +245,7 @@ async def kitty(ctx):
     headers = {
         "x-api-key": catApiKey
     }
+    new_level = set_user_level(ctx.author.id, increment=10)
     
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers) as response:
@@ -244,6 +274,7 @@ async def pokemon(ctx):
     loading = await ctx.send("⌛ Entrando en los arbustos a buscar un Pokémon...")
 
     csv_path = os.path.join(os.path.dirname(__file__), "pokemon_con_imagenes.csv")
+    new_level = set_user_level(ctx.author.id, increment=10)
 
     rows = []
     try:
@@ -339,6 +370,49 @@ async def collection(ctx):
     user_collection = get_user_collection(ctx.author.id)
     total_cards = sum(count for _, count, _ in user_collection) if user_collection else 0
     await ctx.send(f"🎒 {ctx.author.mention} tienes {total_cards} de 151 pokémon en tu colección.")
+
+
+# =======================================================
+# Comando para ver que nivel tiene el usuario
+# =======================================================
+@bot.command()
+async def lvl(ctx):
+    """Muestra el nivel del usuario con una barra de progreso y la foto de perfil."""
+    user_id = ctx.author.id
+    points = set_user_level(user_id, increment=0)  # obtener puntos actuales (la columna 'level' almacena puntos)
+    level = has_level(points)
+
+    points_in_current = points % 100
+    next_level_points = 100
+    remaining = next_level_points - points_in_current
+
+    # Barra de progreso
+    bar_length = 20
+    filled = int((points_in_current / next_level_points) * bar_length)
+    bar = "█" * filled + "░" * (bar_length - filled)
+    percent = int((points_in_current / next_level_points) * 100)
+
+    # Obtener avatar del usuario (compatible con distintas versiones de discord.py)
+    try:
+        avatar_url = ctx.author.display_avatar.url
+    except Exception:
+        avatar_url = getattr(ctx.author, "avatar_url", None)
+
+    embed = discord.Embed(
+        title=f"Nivel de {ctx.author.display_name}",
+        color=discord.Color.red()
+    )
+    if avatar_url:
+        embed.set_thumbnail(url=avatar_url)
+
+    embed.add_field(
+        name=f"Nivel: {level}",
+        value=f"{bar}  ({percent}%).",
+        inline=False
+    )
+
+    await ctx.send(embed=embed)
+
 
 
 # =======================================================
